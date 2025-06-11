@@ -1,23 +1,14 @@
-import React, { type CSSProperties } from "react";
-import {
-  type ColumnDef,
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-  type Row,
-  type Header,
-} from "@tanstack/react-table";
 import {
   closestCenter,
   DndContext,
-  type DragEndEvent,
   KeyboardSensor,
   MouseSensor,
   TouchSensor,
   useSensor,
   useSensors,
-  type UniqueIdentifier,
+  type DragEndEvent,
   type Modifier,
+  type UniqueIdentifier,
 } from "@dnd-kit/core";
 import {
   restrictToHorizontalAxis,
@@ -26,11 +17,20 @@ import {
 import {
   arrayMove,
   horizontalListSortingStrategy,
-  verticalListSortingStrategy,
   SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import {
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+  type ColumnDef,
+  type Header,
+  type Row,
+} from "@tanstack/react-table";
+import React, { type CSSProperties } from "react";
 import { makeData, type Person } from "./fixtures/makeData";
 
 // 📌 Column 드래그 헤더
@@ -53,17 +53,16 @@ const DraggableTableHeader = ({
 
   return (
     <th ref={setNodeRef} style={style} colSpan={header.colSpan}>
-      {header.isPlaceholder
-        ? null
-        : flexRender(header.column.columnDef.header, header.getContext())}
-      <button {...attributes} {...listeners}>
-        📍
-      </button>
+      {header.isPlaceholder ? null : (
+        <div {...attributes} {...listeners}>
+          {flexRender(header.column.columnDef.header, header.getContext())}
+        </div>
+      )}
     </th>
   );
 };
 
-// 📌 Row 드래그 row
+// 📌 Row 드래그
 const DraggableRow = ({ row }: { row: Row<Person> }) => {
   const id = `row-${row.original.userId}`; // prefix 유지!
   const {
@@ -109,10 +108,12 @@ export const BasicTable = () => {
   const [dynamicColumns, setDynamicColumns] = React.useState<
     ColumnDef<Person>[]
   >([
-    { accessorKey: "firstName", id: "firstName", header: "First" },
-    { accessorKey: "lastName", id: "lastName", header: "Last" },
+    { accessorKey: "firstName", id: "firstName", header: "First Name" },
+    { accessorKey: "lastName", id: "lastName", header: "Last Name" },
     { accessorKey: "age", id: "age", header: "Age" },
     { accessorKey: "visits", id: "visits", header: "Visits" },
+    { accessorKey: "status", id: "status", header: "Status" },
+    { accessorKey: "progress", id: "progress", header: "Profile Progress" },
   ]);
 
   const dragHandleColumn: ColumnDef<Person> = {
@@ -198,7 +199,7 @@ export const BasicTable = () => {
       accessorKey: newColumnKey,
       id: newColumnKey,
       header: `동적 컬럼 ${dynamicColumns.length + 1}`,
-      cell: (info: any) => `값: ${info.getValue() || "-"}`,
+      cell: (info: any) => `${info.getValue() || "-"}`,
     };
     setDynamicColumns((prevColumns) => [...prevColumns, newColumn]);
   };
