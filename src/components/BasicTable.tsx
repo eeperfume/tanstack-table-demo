@@ -270,7 +270,7 @@ export const BasicTable = () => {
     .rows.map((r) => `row-${r.original.userId}`);
   const colIds = dynamicColumns.map((c) => `col-${c.id}`);
 
-  const rerender = () => setData(() => makeData(20));
+  const rerender = (count: number = 20) => setData(() => makeData(count));
 
   const addDynamicColumn = () => {
     const newColumnKey = `dynamic-col-${dynamicColumns.length + 1}`;
@@ -326,7 +326,6 @@ export const BasicTable = () => {
 
   const handleHeaderClick = (e: React.MouseEvent, columnId: string) => {
     const rect = (e.target as HTMLElement).getBoundingClientRect();
-    console.log(`rect => ${JSON.stringify(rect)}`);
     setPopoverPos({ top: rect.bottom, left: rect.left });
     setTargetColumnId(columnId);
     setShowPopover(true);
@@ -358,10 +357,7 @@ export const BasicTable = () => {
     <DndContext
       collisionDetection={closestCenter}
       sensors={sensors}
-      onDragStart={(e) => {
-        setActiveId(e.active.id);
-        // setShowPopover(false);
-      }}
+      onDragStart={(e) => setActiveId(e.active.id)}
       onDragEnd={(e) => {
         setActiveId(null);
         handleDragEnd(e);
@@ -371,10 +367,16 @@ export const BasicTable = () => {
       <div className="p-4">
         <div className="flex flex-wrap gap-2 mb-2">
           <button
-            onClick={rerender}
+            onClick={() => rerender()}
             className="border rounded-md p-1 bg-[#5da5ce] text-[#183347]"
           >
             Regenerate
+          </button>
+          <button
+            onClick={() => rerender(100)}
+            className="border rounded-md p-1 bg-[#ecbf42] text-[#402c1b]"
+          >
+            100 Data Regenerate
           </button>
           <button
             onClick={addDynamicColumn}
