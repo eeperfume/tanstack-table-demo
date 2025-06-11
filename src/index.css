@@ -21,6 +21,10 @@ th {
   padding: 2px 4px;
 }
 
+td {
+  padding: 2px 4px;
+}
+
 tfoot {
   color: gray;
 }
