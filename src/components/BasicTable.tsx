@@ -193,14 +193,20 @@ export const BasicTable = () => {
   const rerender = () => setData(() => makeData(20));
 
   const addDynamicColumn = () => {
-    const newColumnKey = `dynamic-col-${dynamicColumns.length - 1}`;
+    const newColumnKey = `dynamic-col-${dynamicColumns.length + 1}`;
     const newColumn = {
       accessorKey: newColumnKey,
       id: newColumnKey,
-      header: `동적 컬럼 ${dynamicColumns.length - 1}`,
+      header: `동적 컬럼 ${dynamicColumns.length + 1}`,
       cell: (info: any) => `값: ${info.getValue() || "-"}`,
     };
     setDynamicColumns((prevColumns) => [...prevColumns, newColumn]);
+  };
+
+  const addRow = () => {
+    const copyData = [...data];
+    const addData = makeData(1);
+    setData([...copyData, ...addData]);
   };
 
   return (
@@ -221,6 +227,9 @@ export const BasicTable = () => {
           </button>
           <button onClick={addDynamicColumn} className="border p-1">
             Add Column
+          </button>
+          <button onClick={addRow} className="border p-1">
+            Add Row
           </button>
         </div>
         <table>
