@@ -32,12 +32,15 @@ import {
 } from "@tanstack/react-table";
 import React, { type CSSProperties, type HTMLProps } from "react";
 import { makeData, type Person } from "./fixtures/makeData";
+import dragHandleIcon from "/public/icons8-drag-handle-30.png";
 
 // 📌 Column 드래그 헤더
 const DraggableTableHeader = ({
   header,
+  onHeaderClick,
 }: {
   header: Header<Person, unknown>;
+  onHeaderClick: (e: React.MouseEvent, columnId: string) => void;
 }) => {
   const id = `col-${header.column.id}`;
   const { attributes, listeners, setNodeRef, transform, isDragging } =
@@ -52,10 +55,28 @@ const DraggableTableHeader = ({
   };
 
   return (
-    <th ref={setNodeRef} style={style} colSpan={header.colSpan}>
-      {header.isPlaceholder ? null : (
-        <div {...attributes} {...listeners}>
-          {flexRender(header.column.columnDef.header, header.getContext())}
+    <th
+      ref={setNodeRef}
+      style={style}
+      colSpan={header.colSpan}
+      className="hover:bg-gray-100"
+    >
+      {!header.isPlaceholder && (
+        <div className="flex justify-between items-center">
+          <span
+            onClick={(e) => onHeaderClick(e, header.column.id)}
+            className="cursor-pointer"
+          >
+            {flexRender(header.column.columnDef.header, header.getContext())}
+          </span>
+          <span
+            {...attributes}
+            {...listeners}
+            onClick={(e) => e.stopPropagation()}
+            className="cursor-move"
+          >
+            <img src={dragHandleIcon} className="h-[13px] w-[13px]" />
+          </span>
         </div>
       )}
     </th>
@@ -91,10 +112,7 @@ const DraggableRow = ({ row }: { row: Row<Person> }) => {
             {isHandle ? (
               <div className="flex justify-end items-center gap-2">
                 <button {...attributes} {...listeners}>
-                  <img
-                    src="public/icons8-drag-handle-30.png"
-                    className="h-[13px] w-[13px]"
-                  />
+                  <img src={dragHandleIcon} className="h-[13px] w-[13px]" />
                 </button>
                 {flexRender(cell.column.columnDef.cell, cell.getContext())}
               </div>
@@ -145,6 +163,14 @@ export const BasicTable = () => {
     { accessorKey: "progress", id: "progress", header: "Profile Progress" },
   ]);
   const [rowSelection, setRowSelection] = React.useState({});
+  const [showPopover, setShowPopover] = React.useState(false);
+  const [popoverPos, setPopoverPos] = React.useState<{
+    top: number;
+    left: number;
+  }>({ top: 0, left: 0 });
+  const [targetColumnId, setTargetColumnId] = React.useState<string | null>(
+    null
+  );
 
   const dragHandleColumn: ColumnDef<Person> = {
     id: "drag-handle",
@@ -271,11 +297,71 @@ export const BasicTable = () => {
     table.toggleAllRowsSelected(false); // (선택 사항) 행 제거 후 모든 선택을 해제
   };
 
+  const renderPopover = () => {
+    if (!showPopover || !targetColumnId) return null;
+
+    return (
+      <div
+        ref={popoverRef} // React가 해당 DOM 요소가 마운트되었을 때 popoverRef.current = 해당 DOM 노드를 넣어준다.
+        className="absolute z-50 border rounded bg-white shadow p-2 text-sm"
+        style={{
+          top: popoverPos.top + 4,
+          left: popoverPos.left,
+        }}
+      >
+        <button
+          onClick={() => {
+            setDynamicColumns((prev) =>
+              prev.filter((col) => col.id !== targetColumnId)
+            );
+            setShowPopover(false);
+          }}
+          className="text-red-600 hover:underline"
+        >
+          속성 삭제
+        </button>
+      </div>
+    );
+  };
+
+  const handleHeaderClick = (e: React.MouseEvent, columnId: string) => {
+    const rect = (e.target as HTMLElement).getBoundingClientRect();
+    console.log(`rect => ${JSON.stringify(rect)}`);
+    setPopoverPos({ top: rect.bottom, left: rect.left });
+    setTargetColumnId(columnId);
+    setShowPopover(true);
+  };
+
+  const popoverRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        popoverRef.current &&
+        !popoverRef.current.contains(e.target as Node) // 팝오버 외부를 클릭했다는 뜻
+      ) {
+        setShowPopover(false);
+      }
+    };
+
+    // 팝오버가 떠 있는 경우 mousedown 이벤트 리스너를 전역(document)에 추가
+    if (showPopover) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showPopover]);
+
   return (
     <DndContext
       collisionDetection={closestCenter}
       sensors={sensors}
-      onDragStart={(e) => setActiveId(e.active.id)}
+      onDragStart={(e) => {
+        setActiveId(e.active.id);
+        // setShowPopover(false);
+      }}
       onDragEnd={(e) => {
         setActiveId(null);
         handleDragEnd(e);
@@ -329,7 +415,11 @@ export const BasicTable = () => {
                         )}
                       </th>
                     ) : (
-                      <DraggableTableHeader key={header.id} header={header} />
+                      <DraggableTableHeader
+                        key={header.id}
+                        header={header}
+                        onHeaderClick={handleHeaderClick}
+                      />
                     )
                   )}
                 </tr>
@@ -347,9 +437,12 @@ export const BasicTable = () => {
             </SortableContext>
           </tbody>
         </table>
-        {/* <pre>{JSON.stringify(data, null, 2)}</pre> */}
-        <pre>{JSON.stringify(table.getState().rowSelection, null, 2)}</pre>
+        {/* 데이터 목록 */}
+        <pre>{JSON.stringify(data, null, 2)}</pre>
+        {/* 체크된 데이터 Ids */}
+        {/* <pre>{JSON.stringify(table.getState().rowSelection, null, 2)}</pre> */}
       </div>
+      {renderPopover()}
     </DndContext>
   );
 };
