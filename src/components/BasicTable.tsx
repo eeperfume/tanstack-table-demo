@@ -3,6 +3,7 @@ import {
   DndContext,
   KeyboardSensor,
   MouseSensor,
+  PointerSensor,
   TouchSensor,
   useSensor,
   useSensors,
@@ -62,21 +63,12 @@ const DraggableTableHeader = ({
       className="hover:bg-gray-100"
     >
       {!header.isPlaceholder && (
-        <div className="flex justify-between items-center">
-          <span
-            onClick={(e) => onHeaderClick(e, header.column.id)}
-            className="cursor-pointer"
-          >
-            {flexRender(header.column.columnDef.header, header.getContext())}
-          </span>
-          <span
-            {...attributes}
-            {...listeners}
-            onClick={(e) => e.stopPropagation()}
-            className="cursor-move"
-          >
-            <img src={dragHandleIcon} className="h-[13px] w-[13px]" />
-          </span>
+        <div
+          {...attributes}
+          {...listeners}
+          onClick={(e) => onHeaderClick(e, header.column.id)}
+        >
+          {flexRender(header.column.columnDef.header, header.getContext())}
         </div>
       )}
     </th>
@@ -255,7 +247,12 @@ export const BasicTable = () => {
   const sensors = useSensors(
     useSensor(MouseSensor),
     useSensor(TouchSensor),
-    useSensor(KeyboardSensor)
+    useSensor(KeyboardSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    })
   );
 
   const [activeId, setActiveId] = React.useState<UniqueIdentifier | null>(null);
