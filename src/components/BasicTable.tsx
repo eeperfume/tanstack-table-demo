@@ -66,7 +66,7 @@ const DraggableTableHeader = ({
         <div
           {...attributes}
           {...listeners}
-          onClick={(e) => onHeaderClick(e, header.column.id)}
+          onClick={(e) => onHeaderClick(e, id)} // 'id' (col-컬럼ID)를 넘겨주도록 변경
         >
           {flexRender(header.column.columnDef.header, header.getContext())}
         </div>
@@ -155,6 +155,8 @@ export const BasicTable = () => {
     { accessorKey: "progress", id: "progress", header: "Profile Progress" },
   ]);
   const [rowSelection, setRowSelection] = React.useState({});
+
+  // 첫 번째 팝오버 (속성 삭제, 정렬 버튼)
   const [showPopover, setShowPopover] = React.useState(false);
   const [popoverPos, setPopoverPos] = React.useState<{
     top: number;
@@ -163,6 +165,14 @@ export const BasicTable = () => {
   const [targetColumnId, setTargetColumnId] = React.useState<string | null>(
     null
   );
+
+  // 두 번째 팝오버 (정렬 옵션)
+  const [showSortPopover, setShowSortPopover] = React.useState(false);
+  const [sortPopoverPos, setSortPopoverPos] = React.useState<{
+    top: number;
+    left: number;
+  }>({ top: 0, left: 0 });
+  const [sortColumnId, setSortColumnId] = React.useState<string | null>(null);
 
   const dragHandleColumn: ColumnDef<Person> = {
     id: "drag-handle",
@@ -198,9 +208,9 @@ export const BasicTable = () => {
   const table = useReactTable({
     data,
     columns,
-    initialState: {
-      columnOrder: ["drag-handle", "status", "visits"],
-    },
+    // initialState: {
+    //   columnOrder: ["drag-handle", "status", "visits"],
+    // },
     state: {
       rowSelection,
     },
@@ -303,7 +313,7 @@ export const BasicTable = () => {
     return (
       <div
         ref={popoverRef} // React가 해당 DOM 요소가 마운트되었을 때 popoverRef.current = 해당 DOM 노드를 넣어준다.
-        className="absolute z-50 border rounded bg-white shadow p-2 text-sm"
+        className="absolute z-50 border rounded bg-white shadow p-2 text-sm flex flex-col gap-1"
         style={{
           top: popoverPos.top + 4,
           left: popoverPos.left,
@@ -312,13 +322,54 @@ export const BasicTable = () => {
         <button
           onClick={() => {
             setDynamicColumns((prev) =>
-              prev.filter((col) => col.id !== targetColumnId)
+              prev.filter((col) => `col-${col.id}` !== targetColumnId)
             );
             setShowPopover(false);
+            setShowSortPopover(false); // 팝오버 닫을 때 정렬 팝오버도 닫기
           }}
-          className="text-red-600 hover:underline"
+          className="text-red-600 hover:underline text-left"
         >
           속성 삭제
+        </button>
+        <button
+          onMouseEnter={(e) => handleSortButtonHover(e)}
+          className="text-blue-600 hover:underline text-left"
+        >
+          정렬
+        </button>
+      </div>
+    );
+  };
+
+  const renderSortPopover = (): React.JSX.Element | null => {
+    if (!showSortPopover || !sortColumnId) return null;
+
+    return (
+      <div
+        ref={sortPopoverRef}
+        className="absolute z-50 border rounded bg-white shadow p-2 text-sm flex flex-col gap-1"
+        style={{
+          top: sortPopoverPos.top,
+          left: sortPopoverPos.left,
+        }}
+      >
+        <button
+          onClick={() => {
+            handleSort(sortColumnId, "asc");
+            setShowPopover(false); // 정렬 후 첫 번째 팝오버도 닫기
+          }}
+          className="hover:bg-gray-100 p-1 rounded text-left"
+        >
+          오름차순
+        </button>
+        <button
+          onClick={() => {
+            handleSort(sortColumnId, "desc");
+            setShowPopover(false); // 정렬 후 첫 번째 팝오버도 닫기
+          }}
+          className="hover:bg-gray-100 p-1 rounded text-left"
+        >
+          내림차순
         </button>
       </div>
     );
@@ -329,29 +380,138 @@ export const BasicTable = () => {
     setPopoverPos({ top: rect.bottom, left: rect.left });
     setTargetColumnId(columnId);
     setShowPopover(true);
+    setShowSortPopover(false); // 헤더 클릭 시 정렬 팝오버는 숨기기
+  };
+
+  const handleSortButtonHover = (e: React.MouseEvent) => {
+    const rect = (e.target as HTMLElement).getBoundingClientRect();
+    setSortPopoverPos({ top: rect.top, left: rect.right + 4 });
+    setSortColumnId(targetColumnId); // 정렬할 컬럼 ID 설정
+    setShowSortPopover(true);
+  };
+
+  const handleSort = (columnId: string, direction: "asc" | "desc") => {
+    // columnId에서 'col-' 접두사를 제거하여 실제 컬럼 ID를 얻습니다.
+    const actualColumnId = columnId.replace("col-", "");
+
+    // dynamicColumns에서 accessorKey가 있는 컬럼을 찾습니다.
+    const column = dynamicColumns.find(
+      (col) => col.id === actualColumnId && "accessorKey" in col
+    ) as ColumnDef<Person> & { accessorKey: keyof Person }; // 타입 단언 추가
+
+    if (!column || !column.accessorKey) {
+      console.warn(
+        "Invalid column or accessorKey not found for sorting:",
+        columnId
+      );
+      return;
+    }
+
+    const accessorKey = column.accessorKey;
+
+    const sortedData = [...data].sort((a, b) => {
+      const valA = a[accessorKey];
+      const valB = b[accessorKey];
+
+      // undefined나 null 값에 대한 처리 (선택 사항)
+      // 정렬 시 undefined/null 값을 어떻게 처리할지 결정해야 한다.
+      // 여기서는 null/undefined를 가장 마지막으로 보내기로 한다.
+      if (valA === undefined || valA === null) return 1;
+      if (valB === undefined || valB === null) return -1;
+
+      if (typeof valA === "string" && typeof valB === "string") {
+        return direction === "asc"
+          ? valA.localeCompare(valB)
+          : valB.localeCompare(valA);
+      } else if (typeof valA === "number" && typeof valB === "number") {
+        return direction === "asc" ? valA - valB : valB - valA;
+      } else if (typeof valA === "boolean" && typeof valB === "boolean") {
+        // boolean 값 정렬 (예: true가 false보다 큼)
+        return direction === "asc"
+          ? valA === valB
+            ? 0
+            : valA
+            ? 1
+            : -1
+          : valA === valB
+          ? 0
+          : valA
+          ? -1
+          : 1;
+      }
+      // 다른 타입의 값에 대한 기본 정렬 (비교할 수 없는 경우 0 반환)
+      return 0;
+    });
+
+    setData(sortedData);
+    setShowSortPopover(false); // 정렬 후 두 번째 팝오버 닫기
   };
 
   const popoverRef = React.useRef<HTMLDivElement>(null);
+  const sortPopoverRef = React.useRef<HTMLDivElement>(null);
 
+  // 팝오버 외부 클릭 감지
   React.useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (
-        popoverRef.current &&
-        !popoverRef.current.contains(e.target as Node) // 팝오버 외부를 클릭했다는 뜻
-      ) {
-        setShowPopover(false);
+      // 팝오버가 모두 닫혀있다면 더 이상 처리할 필요 없음
+      if (!showPopover && !showSortPopover) {
+        return;
+      }
+
+      const clickedElement = e.target as Node;
+
+      // 첫 번째 팝오버의 외부를 클릭했고, 클릭된 요소가 두 번째 팝오버 내부에 있지 않은 경우
+      const isClickedOutsideFirstPopover =
+        popoverRef.current && !popoverRef.current.contains(clickedElement);
+
+      // 두 번째 팝오버의 외부를 클릭했고, 클릭된 요소가 첫 번째 팝오버 내부에 있지 않은 경우
+      const isClickedOutsideSecondPopover =
+        sortPopoverRef.current &&
+        !sortPopoverRef.current.contains(clickedElement);
+
+      // 시나리오 1: 두 번째 팝오버가 열려있는 경우
+      if (showSortPopover) {
+        // 클릭된 위치가 두 번째 팝오버 외부인 경우 (정렬 버튼 클릭은 제외)
+        if (isClickedOutsideSecondPopover) {
+          // 클릭된 위치가 첫 번째 팝오버의 "정렬" 버튼이 아닌 경우에만 닫기
+          // 즉, "정렬" 버튼을 클릭해서 두 번째 팝오버가 열렸고, 그 클릭이 외부 클릭으로 인식되면 안 되므로
+          // 첫 번째 팝오버 안에 있지만 두 번째 팝오버는 아닌 영역을 클릭했을 때도 닫히도록 처리
+          if (
+            popoverRef.current &&
+            popoverRef.current.contains(clickedElement) &&
+            !sortPopoverRef.current?.contains(clickedElement) // 이 조건은 필요 없을 수 있으나, 안전을 위해
+          ) {
+            // 첫 번째 팝오버 내에서 "정렬" 버튼을 클릭해서 두 번째 팝오버가 열렸을 때
+            // 해당 클릭은 외부 클릭으로 간주하지 않으므로 아무것도 하지 않음.
+            // 하지만 그 외의 첫 번째 팝오버 영역을 클릭하면 닫히게 할 것.
+            // 여기서 `return`을 하면 첫 번째 팝오버의 다른 부분을 클릭해도 닫히지 않게 됨.
+            // 원하는 동작은 두 번째 팝오버가 열려 있을 때, 다른 곳을 클릭하면 둘 다 닫히는 것이므로
+            // 이 조건 대신 아래의 통합된 닫기 로직을 사용.
+          } else {
+            // 두 번째 팝오버 외부를 클릭한 경우, 두 팝오버 모두 닫기
+            setShowSortPopover(false);
+            setShowPopover(false);
+          }
+        }
+      }
+      // 시나리오 2: 첫 번째 팝오버만 열려있는 경우 (두 번째 팝오버는 닫혀있음)
+      else if (showPopover) {
+        // 첫 번째 팝오버의 외부를 클릭한 경우
+        if (isClickedOutsideFirstPopover) {
+          setShowPopover(false);
+        }
       }
     };
 
-    // 팝오버가 떠 있는 경우 mousedown 이벤트 리스너를 전역(document)에 추가
-    if (showPopover) {
+    // 팝오버가 하나라도 열려 있을 때만 이벤트 리스너 등록
+    if (showPopover || showSortPopover) {
       document.addEventListener("mousedown", handleClickOutside);
     }
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [showPopover]);
+  }, [showPopover, showSortPopover]); // showPopover, showSortPopover 상태 변화에 따라 effect 재실행
 
   return (
     <DndContext
@@ -445,6 +605,7 @@ export const BasicTable = () => {
         {/* <pre>{JSON.stringify(table.getState().rowSelection, null, 2)}</pre> */}
       </div>
       {renderPopover()}
+      {renderSortPopover()}
     </DndContext>
   );
 };
