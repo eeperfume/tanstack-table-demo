@@ -198,6 +198,9 @@ export const BasicTable = () => {
   const table = useReactTable({
     data,
     columns,
+    initialState: {
+      columnOrder: ["drag-handle", "status", "visits"],
+    },
     state: {
       rowSelection,
     },
